@@ -75,7 +75,8 @@ app.get('/api/guests/stats', authMiddleware, async (req, res) => {
         const guests = await Guest.find({ userId: req.user.id });
         const stats = {
             totalInvited: guests.reduce((sum, g) => sum + g.invitedCount, 0),
-            totalConfirmed: guests.reduce((sum, g) => sum + g.confirmedCount, 0)
+            totalConfirmed: guests.reduce((sum, g) => sum + g.confirmedCount, 0),
+            totalDeclined: guests.reduce((sum, g) => sum + (g.status === 'Declined' ? g.invitedCount : 0), 0)
         };
         res.json(stats);
     } catch (err) {
