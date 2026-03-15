@@ -48,61 +48,20 @@ jobs:
           "
 
   integration-tests:
-    name: Run Integration Tests
+    name: Run Integration Tests (API)
     needs: unit-tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      - name: Deploy testing environment (docker-compose up)
-        run: docker compose up -d --build
-
-      - name: Wait for Containers to be Ready
-        run: sleep 15
-
-      - name: Run API Integration Tests
-        run: |
-          echo "Registering test user..."
-          TOKEN=$(curl -sf -X POST http://localhost:5000/api/auth/register \
-            -H "Content-Type: application/json" \
-            -d '{"email":"test@test.com","password":"testpassword123"}' | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
-
-          if [ -z "$TOKEN" ]; then
-            echo "Failed to get auth token!"
-            exit 1
-          fi
-          echo "Token obtained successfully."
-
-          echo "Testing GET /api/guests..."
-          curl -f http://localhost:5000/api/guests \
-            -H "Authorization: Bearer $TOKEN" || exit 1
-
-          echo "Testing POST /api/guests..."
-          curl -f -X POST http://localhost:5000/api/guests \
-            -H "Content-Type: application/json" \
-            -H "Authorization: Bearer $TOKEN" \
-            -d '{"firstName":"Integration","lastName":"Test","phone":"000-0000","side":"Bride","category":"Friends","invitedCount":1,"confirmedCount":1}' || exit 1
-
-      - name: Clean up test environment
-        if: always()
-        run: docker compose down
-
-  e2e-tests:
-    name: Run E2E Infrastructure Tests
-    needs: integration-tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
-
-      - name: Start full stack (docker-compose up)
+      - name: Start services (docker-compose up)
         run: docker compose up -d --build
 
       - name: Wait for services to be ready
         run: sleep 20
 
-      - name: Run E2E Infrastructure Tests
+      - name: Run API Integration Tests
         run: |
           chmod +x e2e/e2e-infra-test.sh
           API_URL=http://localhost:5000 bash e2e/e2e-infra-test.sh
@@ -113,7 +72,7 @@ jobs:
 
   build-and-publish:
     name: Build & Publish Backend to AWS ECR
-    needs: e2e-tests
+    needs: integration-tests
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -162,3 +121,23 @@ jobs:
           aws eks update-kubeconfig --region ap-south-1 --name asaf-cluster --role-arn arn:aws:iam::329437500409:role/AntigravityRestrictedRole
           kubectl set image deployment/backend backend=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           kubectl rollout status deployment/backend
+
+  smoke-test-prod:
+    name: Post-Deployment Smoke Test
+    needs: build-and-publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Run Smoke Test on Production
+        env:
+          # You should set this in GitHub Secrets or determine it dynamically
+          API_URL: ${{ secrets.PROD_API_URL }} 
+        run: |
+          if [ -z "$API_URL" ]; then
+            echo "PROD_API_URL not set, skipping smoke test. Please add it to GitHub Secrets."
+            exit 0
+          fi
+          chmod +x e2e/e2e-infra-test.sh
+          bash e2e/e2e-infra-test.sh
