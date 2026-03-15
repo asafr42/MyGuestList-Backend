@@ -14,17 +14,34 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const JWT_SECRET = process.env.JWT_SECRET || 'myguestlist-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+    console.error('FATAL ERROR: JWT_SECRET is not defined.');
+    process.exit(1);
+}
 
 // If we are not running tests, connect to the real DB and start listening
 if (process.env.NODE_ENV !== 'test') {
-    mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/myguestlist', {
+    const MONGO_URI = process.env.MONGO_URI;
+    if (!MONGO_URI) {
+        console.error('FATAL ERROR: MONGO_URI is not defined.');
+        process.exit(1);
+    }
+
+    mongoose.connect(MONGO_URI, {
         useNewUrlParser: true,
         useUnifiedTopology: true
     }).then(() => console.log('MongoDB Connected'))
-        .catch(err => console.error(err));
+        .catch(err => {
+            console.error('MongoDB Connection Error:', err);
+            process.exit(1);
+        });
 
-    const PORT = process.env.PORT || 5000;
+    const PORT = process.env.PORT;
+    if (!PORT) {
+        console.error('FATAL ERROR: PORT is not defined.');
+        process.exit(1);
+    }
     app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 }
 
