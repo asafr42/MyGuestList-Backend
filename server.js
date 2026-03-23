@@ -45,6 +45,18 @@ if (process.env.NODE_ENV !== 'test') {
     app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 }
 
+// ─── HEALTH CHECK ────────────────────────────────────────────────────────────
+
+app.get('/health', (req, res) => {
+    const dbState = mongoose.connection.readyState;
+    // 0 = disconnected, 1 = connected, 2 = connecting, 3 = disconnecting
+    if (dbState === 1) {
+        res.status(200).json({ status: 'ok', db: 'connected' });
+    } else {
+        res.status(503).json({ status: 'error', db: 'disconnected' });
+    }
+});
+
 // ─── AUTH ROUTES ─────────────────────────────────────────────────────────────
 
 // POST /api/auth/register

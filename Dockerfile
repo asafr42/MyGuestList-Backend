@@ -15,8 +15,10 @@ WORKDIR /app
 # Copy node_modules from the builder stage
 COPY --from=builder /app/node_modules ./node_modules
 
-# Copy the rest of the application code
-COPY . .
+# Copy only the application source files needed at runtime
+COPY server.js ./
+COPY models/ ./models/
+COPY middleware/ ./middleware/
 
 # Run as non-root user for security (Bonus Best Practice!)
 USER node

@@ -25,27 +25,10 @@ jobs:
         run: npm install
 
       - name: Run Backend Unit Tests
-        run: |
-          node -e "
-          const assert = require('assert');
-          console.log('Running Inline Unit Test...');
-
-          const calculateStats = (guests) => {
-            return {
-              totalInvited: guests.reduce((sum, g) => sum + g.invitedCount, 0),
-              totalConfirmed: guests.reduce((sum, g) => sum + g.confirmedCount, 0)
-            };
-          };
-
-          const stats = calculateStats([
-            { invitedCount: 2, confirmedCount: 2 },
-            { invitedCount: 3, confirmedCount: 1 }
-          ]);
-
-          assert.strictEqual(stats.totalInvited, 5);
-          assert.strictEqual(stats.totalConfirmed, 3);
-          console.log('Unit test passed! Stats calculated correctly.');
-          "
+        env:
+          NODE_ENV: test
+          JWT_SECRET: test-secret-key
+        run: npm test
 
   integration-tests:
     name: Run Integration Tests (API)
@@ -59,7 +42,19 @@ jobs:
         run: docker compose up -d --build
 
       - name: Wait for services to be ready
-        run: sleep 20
+        run: |
+          echo "Waiting for backend to be healthy..."
+          for i in $(seq 1 30); do
+            if curl -s http://localhost:5000/health | grep -q '"status":"ok"'; then
+              echo "Backend is healthy!"
+              exit 0
+            fi
+            echo "Attempt $i/30 - not ready yet, retrying in 2s..."
+            sleep 2
+          done
+          echo "Backend failed to become healthy within 60 seconds"
+          docker compose logs
+          exit 1
 
       - name: Run API Integration Tests
         run: |
@@ -76,6 +71,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -89,11 +85,10 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           default_bump: patch
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ap-south-1
 
       - name: Login to Amazon ECR
