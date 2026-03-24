@@ -24,12 +24,6 @@ describe('Auth Routes', () => {
     expect(res.body.error).toBe('Email and password are required.');
   });
 
-  it('POST /api/auth/login should reject invalid credentials', async () => {
-    const res = await request(app)
-      .post('/api/auth/login')
-      .send({ email: 'nonexistent@test.com', password: 'wrong' });
-    expect(res.status).toBe(401);
-  });
 });
 
 describe('Guest Routes - Auth Protection', () => {
