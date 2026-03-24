@@ -16,6 +16,7 @@ WORKDIR /app
 COPY --from=builder /app/node_modules ./node_modules
 
 # Copy only the application source files needed at runtime
+COPY package*.json ./
 COPY server.js ./
 COPY models/ ./models/
 COPY middleware/ ./middleware/
