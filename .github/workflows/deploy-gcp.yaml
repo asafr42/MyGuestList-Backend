@@ -1,0 +1,51 @@
+name: GCP Backend CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker europe-west1-docker.pkg.dev
+
+      - name: Build and Push Docker Image
+        env:
+          IMAGE_NAME: europe-west1-docker.pkg.dev/myguestlist-asaf42/myguestlist-backend/app
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $IMAGE_NAME:$IMAGE_TAG .
+          docker push $IMAGE_NAME:$IMAGE_TAG
+          docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_NAME:latest
+          docker push $IMAGE_NAME:latest
+
+      - name: Update K8s Manifests (GitOps)
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT_GITHUB }}
+        run: |
+          git clone https://github.com/asafr42/MyGuestList-K8s.git k8s-repo
+          cd k8s-repo
+          sed -i "s|image: europe-west1-docker.pkg.dev/myguestlist-asaf42/myguestlist-backend/app:.*|image: europe-west1-docker.pkg.dev/myguestlist-asaf42/myguestlist-backend/app:${{ github.sha }}|" gcp/backend.yaml
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add gcp/backend.yaml
+          git commit -m "ci: update backend image to ${{ github.sha }} for GCP"
+          git push https://x-access-token:${GITHUB_TOKEN}@github.com/asafr42/MyGuestList-K8s.git main
