@@ -41,11 +41,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.PAT_GITHUB }}
         run: |
-          git clone https://github.com/asafr42/MyGuestList-K8s.git k8s-repo
+          git clone https://github.com/asafr42/MyGuestList-K8s-GCP.git k8s-repo
           cd k8s-repo
           sed -i "s|image: europe-west1-docker.pkg.dev/myguestlist-asaf42/myguestlist-backend/app:.*|image: europe-west1-docker.pkg.dev/myguestlist-asaf42/myguestlist-backend/app:${{ github.sha }}|" gcp/backend.yaml
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
           git add gcp/backend.yaml
           git commit -m "ci: update backend image to ${{ github.sha }} for GCP"
-          git push https://x-access-token:${GITHUB_TOKEN}@github.com/asafr42/MyGuestList-K8s.git main
+          git push https://x-access-token:${GITHUB_TOKEN}@github.com/asafr42/MyGuestList-K8s-GCP.git main
